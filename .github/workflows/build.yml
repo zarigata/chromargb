@@ -37,9 +37,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14        # arm64 runner -> arm64 + x64 dmg
-            plat: mac
-          - os: macos-13        # intel runner -> x64 dmg
+          - os: macos-latest    # arm64 runner; cross-builds arm64 + x64 dmgs
             plat: mac
           - os: windows-latest
             plat: win
@@ -73,13 +71,9 @@ jobs:
       - run: npm ci
         working-directory: app
 
-      - name: Package (mac arm64)
-        if: matrix.plat == 'mac' && runner.arch == 'ARM64'
-        run: npm run dist -- --mac --arm64
-        working-directory: app
-      - name: Package (mac x64)
-        if: matrix.plat == 'mac' && runner.arch == 'X64'
-        run: npm run dist -- --mac --x64
+      - name: Package (mac, both archs)
+        if: matrix.plat == 'mac'
+        run: npm run dist -- --mac --arm64 --x64
         working-directory: app
       - name: Package (windows)
         if: matrix.plat == 'win'
