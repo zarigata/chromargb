@@ -1,0 +1,111 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test (Rust + UI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - run: cargo test --workspace --manifest-path core/Cargo.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+        working-directory: app
+      - run: npm run check
+        working-directory: app
+
+  build:
+    name: Build ${{ matrix.os }}
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # arm64 runner -> arm64 + x64 dmg
+            plat: mac
+          - os: macos-13        # intel runner -> x64 dmg
+            plat: mac
+          - os: windows-latest
+            plat: win
+          - os: ubuntu-latest
+            plat: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+
+      - name: Build daemon
+        run: cargo build --release -p chromargb-daemon
+        working-directory: core
+
+      - name: Stage daemon for electron-builder
+        shell: bash
+        run: |
+          mkdir -p app/resources
+          cp core/target/release/chromargb-daemon${{ matrix.plat == 'win' && '.exe' || '' }} app/resources/ || true
+          ls app/resources
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+        working-directory: app
+
+      - name: Package (mac arm64)
+        if: matrix.plat == 'mac' && runner.arch == 'ARM64'
+        run: npm run dist -- --mac --arm64
+        working-directory: app
+      - name: Package (mac x64)
+        if: matrix.plat == 'mac' && runner.arch == 'X64'
+        run: npm run dist -- --mac --x64
+        working-directory: app
+      - name: Package (windows)
+        if: matrix.plat == 'win'
+        run: npm run dist -- --win
+        working-directory: app
+      - name: Package (linux)
+        if: matrix.plat == 'linux'
+        run: npm run dist -- --linux
+        working-directory: app
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChromaRGB-${{ matrix.os }}
+          path: |
+            app/release/*.dmg
+            app/release/*.exe
+            app/release/*.AppImage
+          if-no-files-found: error
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**
+          generate_release_notes: true

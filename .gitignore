@@ -1,0 +1,18 @@
+# Rust
+core/target/
+**/*.rs.bk
+
+# Node / Electron
+app/node_modules/
+app/dist/
+app/dist-electron/
+app/release/
+app/resources/chromargb-daemon*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# env
+.env
+.env.*
