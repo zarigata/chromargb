@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install hidapi system deps
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libhidapi-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -46,6 +48,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install hidapi system deps (linux)
+        if: matrix.plat == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libhidapi-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
